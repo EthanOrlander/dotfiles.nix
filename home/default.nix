@@ -10,7 +10,7 @@
     ./btop.nix
     ./direnv.nix
     ./gh.nix
-    ./glab.nix
+    ./mise.nix
     ./scripts.nix
   ];
 
@@ -20,9 +20,7 @@
     ripgrep
     tree-sitter
     btop
-    awscli2
-    k9s
-    kubelogin
+    claude-code
     go
     python313
     git-lfs

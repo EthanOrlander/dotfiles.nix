@@ -28,6 +28,10 @@
           system = "aarch64-darwin";
           hostModule = ./home/hosts/work-macbook.nix;
         };
+        "personal-macbook" = mkHome {
+          system = "aarch64-darwin";
+          hostModule = ./home/hosts/personal-macbook.nix;
+        };
       };
     };
 }
