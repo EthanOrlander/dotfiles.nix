@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Wrapper to run rubocop and output ONLY the corrected code
+
+# Find project root by looking for .envrc
+current_dir="$PWD"
+while [[ "$current_dir" != "/" ]]; do
+  if [[ -f "$current_dir/.envrc" ]]; then
+    export DIRENV_LOG_FORMAT=""
+    cd "$current_dir"
+
+    # Read input
+    input=$(cat)
+
+    # Check if we're already in a direnv environment by checking for bundler
+    # If nvim was started from within direnv, we already have the environment!
+    if command -v bundle &> /dev/null; then
+      output=$(echo "$input" | bundle exec rubocop --server "$@" 2>/dev/null)
+    else
+      # Fallback: use direnv exec if not in environment
+      output=$(echo "$input" | direnv exec "$current_dir" bundle exec rubocop --server "$@" 2>/dev/null)
+    fi
+
+    # Output the result (use printf to preserve exact formatting)
+    printf "%s" "$output"
+    exit 0
+  fi
+  current_dir=$(dirname "$current_dir")
+done
+
+# Fallback: no .envrc found
+exit 1

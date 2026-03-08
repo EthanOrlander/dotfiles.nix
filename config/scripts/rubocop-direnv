@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Wrapper script to run rubocop with direnv environment
+
+# Find project root by looking for .envrc
+current_dir="$PWD"
+while [[ "$current_dir" != "/" ]]; do
+  if [[ -f "$current_dir/.envrc" ]]; then
+    cd "$current_dir"
+    eval "$(direnv export bash 2>/dev/null)"
+    # Run rubocop and filter out config warnings
+    bundle exec rubocop "$@" 2>&1 | grep -v "^.rubocop.yml:" | grep -v "The following cops" | grep -v "AllCops:" | grep -v "NewCops:" | grep -v "Enabled:" | grep -v "# new in" | grep -v "For more information:"
+    exit ${PIPESTATUS[0]}
+  fi
+  current_dir=$(dirname "$current_dir")
+done
+
+# Fallback: no .envrc found
+echo "Error: No .envrc found in parent directories" >&2
+exit 1

@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HELPER_DIR="$SCRIPT_DIR/worktree.d"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+usage() {
+    cat <<EOF
+${BLUE}worktree${NC} - Git worktree helper for lims development
+
+${GREEN}Usage:${NC}
+    worktree <command> [options]
+    wt <command> [options]
+
+${GREEN}Commands:${NC}
+    create, c    Create a new worktree with dependencies installed
+    delete, d    Remove a worktree and optionally delete the branch
+    list, l      List all worktrees
+
+${GREEN}Examples:${NC}
+    wt c my-feature              Create worktree for new branch
+    wt c my-feature --tmux       Create and open in tmux window
+    wt c fix-bug --base main     Create branch from main
+    wt d old-feature             Delete worktree and branch
+    wt d old-feature -k          Delete worktree, keep branch
+    wt l                         List all worktrees
+
+${GREEN}Options:${NC}
+    -h, --help   Show help for a command
+
+Run 'worktree <command> --help' for more information on a command.
+EOF
+}
+
+do_open() {
+    # Print the path to a worktree (used by shell function to cd)
+    local branch=$1
+    if [[ -z "$branch" ]]; then
+        printf "${RED}Error:${NC} Branch name required\n" >&2
+        printf "Usage: wt open <branch-name>\n" >&2
+        exit 1
+    fi
+
+    # Find worktree by branch name using git worktree list
+    local worktree_path
+    worktree_path=$(git worktree list --porcelain 2>/dev/null | awk -v branch="$branch" '
+        /^worktree / { path = substr($0, 10) }
+        /^branch refs\/heads\// {
+            b = substr($0, 19)
+            if (b == branch) { print path; exit }
+        }
+    ')
+
+    if [[ -n "$worktree_path" && -d "$worktree_path" ]]; then
+        echo "$worktree_path"
+    else
+        # Fallback: check default path
+        local default_path="$HOME/code/lims-worktrees/$branch"
+        if [[ -d "$default_path" ]]; then
+            echo "$default_path"
+        else
+            printf "${RED}Error:${NC} No worktree found for branch '%s'\n" "$branch" >&2
+            exit 1
+        fi
+    fi
+}
+
+do_list() {
+    # Simple wrapper around git worktree list with nicer output
+    local main_repo
+    main_repo=$(git rev-parse --git-common-dir 2>/dev/null)
+
+    if [[ -z "$main_repo" ]]; then
+        printf "${RED}Error:${NC} Not in a git repository\n" >&2
+        exit 1
+    fi
+
+    # Handle worktree case
+    if [[ "$main_repo" == *"/worktrees/"* ]]; then
+        main_repo="${main_repo%/worktrees/*}"
+        main_repo=$(dirname "$main_repo")
+    else
+        main_repo=$(dirname "$main_repo")
+    fi
+
+    printf "${BLUE}Git Worktrees:${NC}\n\n"
+    git -C "$main_repo" worktree list
+}
+
+# Main command dispatch
+main() {
+    if [[ $# -eq 0 ]]; then
+        usage
+        exit 0
+    fi
+
+    local command=$1
+    shift
+
+    case $command in
+        create|c)
+            source "$HELPER_DIR/create.sh"
+            do_create "$@"
+            ;;
+        delete|d)
+            source "$HELPER_DIR/delete.sh"
+            do_delete "$@"
+            ;;
+        open|o)
+            do_open "$@"
+            ;;
+        list|l)
+            do_list "$@"
+            ;;
+        -h|--help|help)
+            usage
+            exit 0
+            ;;
+        *)
+            printf "${RED}Error:${NC} Unknown command: %s\n\n" "$command" >&2
+            usage
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
